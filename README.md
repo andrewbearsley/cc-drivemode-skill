@@ -83,9 +83,36 @@ The default voice is **Lily** — a British female with a warm, velvety tone. To
 2. Copy the voice ID
 3. Set `ELEVENLABS_VOICE_ID` in your environment
 
+## Making it stick
+
+The install downloads the skill, but Claude Code won't automatically know about it in future conversations. To make drive mode available every time, add a pointer to your `CLAUDE.md`.
+
+### Option A: Global (all projects)
+
+Add to `~/.claude/CLAUDE.md`:
+
+```markdown
+## Drive Mode
+
+When I say "drive mode" or "speak results", read and follow the instructions in
+`~/.openclaw/skills/drive-mode/SKILL.md`.
+```
+
+### Option B: Per-project
+
+Add the same block to any project's `CLAUDE.md` where you want drive mode available.
+
+### Environment variable
+
+Make sure `ELEVENLABS_API_KEY` is available to Claude Code. Add it to your shell profile (`~/.zshrc`, `~/.bashrc`) or to `~/.openclaw/.env`:
+
+```bash
+export ELEVENLABS_API_KEY=your_key_here
+```
+
 ## Usage
 
-Once installed, just tell Claude Code:
+Once wired up, just tell Claude Code:
 
 > "drive mode"
 
