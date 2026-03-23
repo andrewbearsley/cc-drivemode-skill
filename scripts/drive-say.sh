@@ -11,36 +11,33 @@
 #   ELEVENLABS_VOICE_ID  (optional) Voice ID, defaults to Lily
 #   ELEVENLABS_MODEL     (optional) Model ID, defaults to eleven_turbo_v2
 #
-# Requires: curl, afplay (macOS) or mpv/aplay (Linux)
+# Requires: curl, afplay (macOS) or mpv (Linux)
 #
 set -euo pipefail
 
 # --- Dependency check ---
 
-for cmd in curl; do
-  if ! command -v "$cmd" &>/dev/null; then
-    echo "Error: Required command '$cmd' not found." >&2
-    exit 1
-  fi
-done
+if ! command -v curl &>/dev/null; then
+  echo "Error: Required command 'curl' not found." >&2
+  exit 1
+fi
 
 detect_player() {
   if command -v afplay &>/dev/null; then
     echo "afplay"
   elif command -v mpv &>/dev/null; then
     echo "mpv --no-terminal"
-  elif command -v aplay &>/dev/null; then
-    echo "aplay"
   else
     echo ""
   fi
 }
 
-PLAYER=$(detect_player)
-if [ -z "$PLAYER" ]; then
-  echo "Error: No audio player found. Install afplay (macOS), mpv, or aplay." >&2
+PLAYER_STR=$(detect_player)
+if [ -z "$PLAYER_STR" ]; then
+  echo "Error: No audio player found. Install afplay (macOS) or mpv (Linux)." >&2
   exit 1
 fi
+read -ra PLAYER <<< "$PLAYER_STR"
 
 # --- Configuration ---
 
@@ -104,13 +101,10 @@ touch "$LOCK"
 
 # --- Build payload and call API ---
 
-PAYLOAD=$(python3 -c "
-import json, sys
-print(json.dumps({
-    'text': sys.argv[1],
-    'model_id': sys.argv[2]
-}))
-" "$TEXT" "$MODEL")
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+PAYLOAD=$(printf '{"text":"%s","model_id":"%s"}' "$(json_escape "$TEXT")" "$MODEL")
 
 HTTP_CODE=$(curl -s -w '%{http_code}' \
   "https://api.elevenlabs.io/v1/text-to-speech/$VOICE_ID" \
@@ -136,4 +130,4 @@ fi
 
 # --- Play audio ---
 
-$PLAYER "$OUT"
+"${PLAYER[@]}" "$OUT"

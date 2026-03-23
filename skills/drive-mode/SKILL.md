@@ -3,7 +3,7 @@ name: drive-mode
 description: Hands-free audio feedback for Claude Code — announces task progress aloud via ElevenLabs TTS so you can step away from the screen.
 version: 1.0.0
 homepage: https://github.com/andrewbearsley/cc-drivemode-skill
-metadata: {"openclaw": {"requires": {"bins": ["curl", "python3"], "env": ["ELEVENLABS_API_KEY"]}, "primaryEnv": "ELEVENLABS_API_KEY"}}
+metadata: {"openclaw": {"requires": {"bins": ["curl"], "env": ["ELEVENLABS_API_KEY"]}, "primaryEnv": "ELEVENLABS_API_KEY"}}
 ---
 
 # Drive Mode Skill
@@ -158,7 +158,7 @@ Lily (the default) is a British female voice with a warm, velvety tone. The user
 | HTTP 422 | Voice ID or model is invalid — check configuration |
 | HTTP 429 | Rate limited — skip this announcement, try again next milestone |
 | Network error / timeout | Skip silently, continue working |
-| No audio player found | Inform user once, suggest installing `afplay` (macOS) or `mpv` (Linux) |
+| No audio player found | Inform user once, suggest installing `mpv` (Linux) — macOS has `afplay` built in |
 
 If TTS fails, **do not retry in a loop**. Note it once and continue working without voice.
 
@@ -202,4 +202,3 @@ scripts/drive-say.sh "Pipeline running." &
 - Keep messages under ~30 words for natural speech. Split longer updates into separate calls if needed.
 - On macOS, `afplay` is built in. On Linux, install `mpv` (`apt install mpv` or `brew install mpv`).
 - The lock file times out after 30 seconds to recover from crashes.
-- Python 3 is required only for JSON payload construction (no pip packages needed).

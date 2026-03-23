@@ -10,7 +10,7 @@ Hands-free audio feedback for [Claude Code](https://docs.anthropic.com/en/docs/c
 
 If you're an AI agent and your user has pointed you at this repo, here's how to install the skill without cloning.
 
-**Requirements:** `curl`, `python3` must be available on the system. An audio player is needed: `afplay` (macOS, built-in) or `mpv` / `aplay` (Linux).
+**Requirements:** `curl` must be available on the system. An audio player is needed: `afplay` (macOS, built-in) or `mpv` (Linux).
 
 **1. Download the skill and scripts:**
 
@@ -113,7 +113,7 @@ Claude will start announcing progress aloud. That's it.
 | Platform | Audio player | Status |
 |----------|-------------|--------|
 | macOS | `afplay` (built-in) | Fully supported |
-| Linux | `mpv` or `aplay` | Supported (install `mpv` via package manager) |
+| Linux | `mpv` | Supported (install via package manager) |
 | Windows/WSL | `mpv` | Untested |
 
 ## Troubleshooting
@@ -123,7 +123,7 @@ Claude will start announcing progress aloud. That's it.
 | "ELEVENLABS_API_KEY not set" | Env var not loaded | Set `ELEVENLABS_API_KEY` in the environment |
 | HTTP 401 | API key is invalid | Generate a new key at elevenlabs.io |
 | HTTP 422 | Bad voice ID or model | Check `ELEVENLABS_VOICE_ID` and `ELEVENLABS_MODEL` values |
-| No audio player found | Missing `afplay`/`mpv`/`aplay` | macOS has `afplay` built in; on Linux install `mpv` |
+| No audio player found | Missing `afplay`/`mpv` | macOS has `afplay` built in; on Linux install `mpv` |
 | Overlapping speech | Lock file stuck | Delete `/tmp/drive-say.lock` manually (auto-clears after 30s) |
 | No sound | Volume muted or wrong output device | Check system audio settings |
 
