@@ -1,0 +1,13 @@
+{
+  "name": "drive-mode",
+  "description": "Hands-free progress announcements via text-to-speech for Claude Code. Ships a skill plus hooks for end-of-turn tones, permission-prompt alerts, background-task completion chimes, and interrupt-on-new-prompt audio.",
+  "version": "2.0.0",
+  "author": {
+    "name": "Andrew Bearsley",
+    "url": "https://github.com/andrewbearsley"
+  },
+  "homepage": "https://github.com/andrewbearsley/cc-drivemode-skill",
+  "repository": "https://github.com/andrewbearsley/cc-drivemode-skill",
+  "license": "MIT",
+  "keywords": ["tts", "accessibility", "hands-free", "audio", "drive-mode"]
+}

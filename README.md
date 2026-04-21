@@ -1,166 +1,128 @@
-# Drive Mode for Claude Code
+# Drive Mode — Claude Code Plugin
 
-![Format](https://img.shields.io/badge/format-Agent%20Skill-blue)
-![Bash](https://img.shields.io/badge/bash-%23121011?logo=gnu-bash&logoColor=white)
+![Plugin](https://img.shields.io/badge/format-Claude%20Code%20Plugin-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-green)
 ![License](https://img.shields.io/github/license/andrewbearsley/cc-drivemode-skill)
 
-Hands-free audio feedback for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Say "drive mode" and Claude announces task progress aloud via [ElevenLabs](https://elevenlabs.io) text-to-speech — so you can step away from the screen and still know what's happening.
+Hands-free audio feedback for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Say "drive mode" and Claude announces findings, questions, and conclusions aloud, plays tones at key moments (end of turn, blocked on permission, background task complete), and kills in-flight audio when you submit a new prompt.
 
-## Agent quick-start
-
-If you're an AI agent and your user has pointed you at this repo, here's how to install the skill without cloning.
-
-**Requirements:** `curl` must be available on the system. An audio player is needed: `afplay` (macOS, built-in) or `mpv` (Linux).
-
-**1. Download the skill and scripts:**
-
-```bash
-REPO="https://raw.githubusercontent.com/andrewbearsley/cc-drivemode-skill/main"
-SKILL_DIR="$HOME/.openclaw/skills/drive-mode"
-SCRIPT_DIR="$SKILL_DIR/scripts"
-
-mkdir -p "$SCRIPT_DIR"
-curl -fsSL "$REPO/skills/drive-mode/SKILL.md" -o "$SKILL_DIR/SKILL.md"
-curl -fsSL "$REPO/scripts/drive-say.sh" -o "$SCRIPT_DIR/drive-say.sh"
-chmod +x "$SCRIPT_DIR"/*.sh
-```
-
-**2. Set environment variables:**
-
-The skill requires one environment variable. Ask your user for this if they haven't provided it:
-
-| Variable | Required | What it is | Where to find it |
-|----------|----------|-----------|-----------------|
-| `ELEVENLABS_API_KEY` | Yes | API key | [elevenlabs.io](https://elevenlabs.io) > Profile > API Keys |
-| `ELEVENLABS_VOICE_ID` | No | Voice to use | Defaults to Lily (British female). Browse [voice library](https://elevenlabs.io/voice-library) |
-| `ELEVENLABS_MODEL` | No | TTS model | Defaults to `eleven_turbo_v2` (fastest) |
-
-Set it in `~/.openclaw/.env` or in your agent's environment.
-
-**3. Verify it works:**
-
-```bash
-$SCRIPT_DIR/drive-say.sh "Drive mode is active."
-```
-
-**4. Read the SKILL.md** for full behaviour instructions, conciseness rules, and monitoring patterns.
+Built for moments when you're driving, cooking, or otherwise can't look at the screen.
 
 ## What it does
 
-- Speaks task progress aloud so you can work hands-free
-- Queues speech with a lock file to prevent overlapping audio
-- Monitors long-running tasks and announces milestones (25/50/75/100%)
-- Uses touch files to prevent duplicate announcements
-- Stays concise — every second of voice carries information
+| Event | Behavior |
+|-------|----------|
+| Claude makes a finding or asks a question | Speaks it via `say` (or ElevenLabs if configured) |
+| Claude finishes its turn | Soft **Morse** tone — "I'm waiting for you" |
+| Claude is blocked on a permission prompt | Brighter **Glass** tone — "pull over and look" |
+| A background task finishes | Short **Pop** tone — "something completed" |
+| You submit a new prompt | Kills any in-flight speech — your new input doesn't collide with stale audio |
+| Session starts | Clears stale flag file so a crashed-out session doesn't keep playing tones |
 
-## Human setup
+## Requirements
 
-You'll need to do these steps before the agent can use the skill.
+- macOS (uses built-in `say` and `afplay`)
+- Claude Code 2.x or newer with plugin support
 
-### 1. Get an ElevenLabs API key
+ElevenLabs is optional — if `ELEVENLABS_API_KEY` is set in your environment, the speak script routes through ElevenLabs (Lily voice by default) for more natural TTS. Otherwise it falls back to macOS `say` using whatever voice you've set in System Settings > Accessibility > Spoken Content.
 
-1. Sign up at [elevenlabs.io](https://elevenlabs.io)
-2. Go to **Profile** > **API Keys**
-3. Create and copy your key
+Tip: to hear the best quality from `say`, install a Siri or Premium voice via System Settings > Accessibility > Spoken Content > System Voice > Manage Voices.
 
-The free tier includes a generous amount of characters per month. Paid plans offer more.
+## Installation
 
-### 2. Give your agent the credentials
+### Via Claude Code plugin install
 
-Add the environment variable to `~/.openclaw/.env`:
-
-```
-ELEVENLABS_API_KEY=your_api_key_here
-```
-
-Then point your agent at this repo and ask it to install the skill.
-
-### 3. (Optional) Pick a voice
-
-The default voice is **Lily** — a British female with a warm, velvety tone. To use a different voice:
-
-1. Browse the [ElevenLabs voice library](https://elevenlabs.io/voice-library)
-2. Copy the voice ID
-3. Set `ELEVENLABS_VOICE_ID` in your environment
-
-## Making it stick
-
-The install downloads the skill, but Claude Code won't automatically know about it in future conversations. To make drive mode available every time, add a pointer to your `CLAUDE.md`.
-
-### Option A: Global (all projects)
-
-Add to `~/.claude/CLAUDE.md`:
-
-```markdown
-## Drive Mode
-
-When I say "drive mode" or "speak results", read and follow the instructions in
-`~/.openclaw/skills/drive-mode/SKILL.md`.
+```bash
+claude plugin install drive-mode@github:andrewbearsley/cc-drivemode-skill
 ```
 
-### Option B: Per-project
+### Manual / local install (development)
 
-Add the same block to any project's `CLAUDE.md` where you want drive mode available.
+Clone the repo and point Claude Code at it:
 
-### Environment variable
+```bash
+git clone https://github.com/andrewbearsley/cc-drivemode-skill.git
+cd cc-drivemode-skill
+# Then use Claude Code's plugin install with a file:// source,
+# or symlink into ~/.claude/plugins/ (structure may vary by CC version).
+```
 
-Make sure `ELEVENLABS_API_KEY` is available to Claude Code. Add it to your shell profile (`~/.zshrc`, `~/.bashrc`) or to `~/.openclaw/.env`:
+After installing, restart Claude Code or open `/hooks` once to make the settings watcher pick up the bundled hooks.
+
+## Usage
+
+Just say it:
+
+> "drive mode"
+
+Or use the slash command:
+
+```
+/drive-mode
+/drive-mode on
+/drive-mode off
+```
+
+Drive mode stays on for the current session. A `SessionStart` hook clears it on new sessions — activate explicitly each time.
+
+## How it works
+
+```
+cc-drivemode-skill/
+├── .claude-plugin/
+│   └── plugin.json           # plugin manifest
+├── skills/
+│   └── drive-mode/
+│       ├── SKILL.md          # behaviour instructions for Claude
+│       └── speak             # TTS wrapper (ElevenLabs with `say` fallback)
+├── hooks/
+│   └── hooks.json            # Stop, Notification, TaskCompleted, UserPromptSubmit, SessionStart
+├── scripts/
+│   └── task-complete.sh      # filter for TaskCompleted hook (ignores self-triggers)
+├── README.md
+└── LICENSE
+```
+
+The plugin gates every hook on `/tmp/drive-mode.active` — so the tones only fire when drive mode is explicitly on. Activation touches the file, deactivation removes it.
+
+Concurrent `speak` calls are serialized via an atomic `mkdir` lock at `/tmp/drive-mode.lock.d`, so rapid calls queue in order rather than overlapping. (`flock` isn't available on macOS.)
+
+## ElevenLabs (optional)
+
+Copy `.env.example` and set your key:
 
 ```bash
 export ELEVENLABS_API_KEY=your_key_here
 ```
 
-## Usage
-
-Once wired up, just tell Claude Code:
-
-> "drive mode"
-
-or
-
-> "speak results"
-
-Claude will start announcing progress aloud. That's it.
-
-### Manual script usage
+Override voice:
 
 ```bash
-# Basic
-./scripts/drive-say.sh "Deploy complete. All pods healthy."
-
-# Custom voice
-./scripts/drive-say.sh --voice JBFqnCBsd6RMkjVDRZzb "Build started."
-
-# Custom model (multilingual)
-./scripts/drive-say.sh --model eleven_multilingual_v2 "Terminé."
+export DRIVE_MODE_EL_VOICE=pFZP5JQG7iQjIQuC4Bku   # Lily (default)
 ```
 
-## Platform support
+Browse voices at [elevenlabs.io/voice-library](https://elevenlabs.io/voice-library).
 
-| Platform | Audio player | Status |
-|----------|-------------|--------|
-| macOS | `afplay` (built-in) | Fully supported |
-| Linux | `mpv` | Supported (install via package manager) |
-| Windows/WSL | `mpv` | Untested |
+## Sounds
+
+| Hook | File | Character |
+|------|------|-----------|
+| Stop | `/System/Library/Sounds/Morse.aiff` | Soft, short — end of turn |
+| Notification | `/System/Library/Sounds/Glass.aiff` | Brighter — needs your attention |
+| TaskCompleted | `/System/Library/Sounds/Pop.aiff` | Very short — something finished |
+
+Swap any of these in `hooks/hooks.json` to taste.
 
 ## Troubleshooting
 
-| Problem | What's going on | Fix |
-|---------|-----------------|-----|
-| "ELEVENLABS_API_KEY not set" | Env var not loaded | Set `ELEVENLABS_API_KEY` in the environment |
-| HTTP 401 | API key is invalid | Generate a new key at elevenlabs.io |
-| HTTP 422 | Bad voice ID or model | Check `ELEVENLABS_VOICE_ID` and `ELEVENLABS_MODEL` values |
-| No audio player found | Missing `afplay`/`mpv` | macOS has `afplay` built in; on Linux install `mpv` |
-| Overlapping speech | Lock file stuck | Delete `/tmp/drive-say.lock` manually (auto-clears after 30s) |
-| No sound | Volume muted or wrong output device | Check system audio settings |
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `skills/drive-mode/SKILL.md` | Skill definition: agent behaviour instructions, configuration, monitoring patterns |
-| `scripts/drive-say.sh` | TTS wrapper: calls ElevenLabs API and plays audio |
+| Problem | Fix |
+|---------|-----|
+| No audio at all | Check volume; confirm `/tmp/drive-mode.active` exists; `say "test"` works? |
+| Speech overlaps | Stale lock — `rm -rf /tmp/drive-mode.lock.d` |
+| Hooks don't fire after install | Open `/hooks` once in Claude Code, or restart the session (settings watcher needs to reload) |
+| ElevenLabs silent | Check `echo $ELEVENLABS_API_KEY`; HTTP errors are logged to stderr |
+| Speech robotic | Install a Premium or Siri voice via System Settings |
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

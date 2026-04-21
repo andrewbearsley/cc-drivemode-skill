@@ -1,0 +1,49 @@
+#!/bin/bash
+# Drive mode TTS — serialized so concurrent calls queue instead of overlapping.
+# Tries ElevenLabs if ELEVENLABS_API_KEY is set, falls back to macOS `say`.
+
+set -u
+
+TEXT="${1:-}"
+[ -z "$TEXT" ] && { echo "usage: speak <text>" >&2; exit 1; }
+
+VOICE="${DRIVE_MODE_VOICE:-}"  # empty = macOS system default (System Settings > Spoken Content)
+EL_VOICE="${DRIVE_MODE_EL_VOICE:-pFZP5JQG7iQjIQuC4Bku}"  # Lily (ElevenLabs)
+LOCK_DIR="/tmp/drive-mode.lock.d"
+
+# Serialize via mkdir (atomic on POSIX; macOS has no `flock`).
+while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+  if [ -f "$LOCK_DIR/pid" ]; then
+    OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+    if [ -n "$OWNER" ] && ! kill -0 "$OWNER" 2>/dev/null; then
+      rm -rf "$LOCK_DIR"
+      continue
+    fi
+  fi
+  sleep 0.1
+done
+echo $$ > "$LOCK_DIR/pid"
+trap 'rm -rf "$LOCK_DIR"' EXIT TERM INT
+
+if [ -n "${ELEVENLABS_API_KEY:-}" ]; then
+  OUT="/tmp/drive-mode-speech-$$.mp3"
+  PAYLOAD=$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1], "model_id": "eleven_turbo_v2"}))' "$TEXT")
+  HTTP=$(curl -sS -o "$OUT" -w "%{http_code}" \
+    "https://api.elevenlabs.io/v1/text-to-speech/$EL_VOICE" \
+    -H "xi-api-key: $ELEVENLABS_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD" 2>/dev/null)
+  if [ "$HTTP" = "200" ] && [ -s "$OUT" ]; then
+    afplay "$OUT"
+    rm -f "$OUT"
+    exit 0
+  fi
+  echo "drive-mode: ElevenLabs failed (HTTP $HTTP), falling back to say" >&2
+  rm -f "$OUT"
+fi
+
+if [ -n "$VOICE" ]; then
+  say -v "$VOICE" "$TEXT"
+else
+  say "$TEXT"
+fi

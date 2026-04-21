@@ -1,204 +1,83 @@
 ---
 name: drive-mode
-description: Hands-free audio feedback for Claude Code — announces task progress aloud via ElevenLabs TTS so you can step away from the screen.
-version: 1.0.0
-homepage: https://github.com/andrewbearsley/cc-drivemode-skill
-metadata: {"openclaw": {"requires": {"bins": ["curl"], "env": ["ELEVENLABS_API_KEY"]}, "primaryEnv": "ELEVENLABS_API_KEY"}}
+description: Enable hands-free progress announcements via text-to-speech. Use when the user says "drive mode", "speak results", or otherwise indicates they cannot see the screen and need audio updates.
+user_invocable: true
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/skills/drive-mode/speak *) Bash(touch /tmp/drive-mode.active) Bash(rm -f /tmp/drive-mode.active)
 ---
 
-# Drive Mode Skill
+# Drive Mode
 
-Announce task progress aloud using ElevenLabs text-to-speech. When the user activates drive mode, you speak status updates so they can work hands-free.
+The user cannot see the screen. Every meaningful response MUST be spoken aloud via the bundled script. Text-only replies are useless in drive mode.
 
-**Script paths:** All `scripts/` paths below are relative to the skill's install directory. If installed via the agent quick-start, that's `~/.openclaw/skills/drive-mode/scripts/`. Adjust paths based on where you installed the skill.
+## Arguments
 
----
+- `/drive-mode` or `/drive-mode on` — activate
+- `/drive-mode off` — deactivate
+- Also activate if the user says "drive mode" / "speak results" in prose; deactivate if they say "drive mode off" / "stop speaking" / "exit drive mode"
 
 ## Activation
 
-Drive mode activates when the user says **"drive mode"** or **"speak results"**. Once active, announce progress aloud for the remainder of the conversation.
-
----
-
-## How to Speak
-
-Run the TTS script in the background so work continues while speaking:
-
 ```bash
-scripts/drive-say.sh "message" &
+touch /tmp/drive-mode.active
+${CLAUDE_PLUGIN_ROOT}/skills/drive-mode/speak "Drive mode on."
 ```
 
-Or from Claude Code, use the Bash tool with `run_in_background=true`:
+The flag file `/tmp/drive-mode.active` enables bundled hooks:
+- **Stop** — soft Morse tone at end of turn, cueing you're waiting for input
+- **Notification** — brighter Glass tone when Claude is blocked on a permission prompt
+- **TaskCompleted** — short Pop tone when a background task finishes (ignores the speak script and afplay so drive-mode's own audio doesn't self-trigger)
+- **UserPromptSubmit** — kills any in-flight `say`/`afplay` and clears the lock, so a new prompt doesn't collide with leftover audio
+- **SessionStart** — clears the flag on session start so a crashed-out flag doesn't carry over silently
+
+## Deactivation
 
 ```bash
-scripts/drive-say.sh "Build complete. All 47 tests passed."
+rm -f /tmp/drive-mode.active
 ```
 
-**Always run TTS in the background.** Never block on speech output.
+Silent end — don't speak the exit.
 
----
+## Speaking
 
-## What to Announce
-
-Announce at natural milestones:
-
-- **Task started:** Brief description of what you're about to do
-- **Significant progress:** 25%, 50%, 75% milestones for long-running tasks
-- **Completion:** Result summary — what was done, whether it succeeded
-- **Errors or blockers:** Anything that changes the plan
-- **Answers to questions:** When the user asked something and you have the answer
-
-Do NOT announce:
-- Routine file reads or searches
-- Individual tool calls
-- TTS completion confirmations
-
----
-
-## Conciseness Rules
-
-Every second of voice time must carry information. Be direct.
-
-**Good:**
-- "Fees included. 0.1% per side, 0.05% slippage. All numbers are net."
-- "Build failed. Missing import in auth service line 42. Fixing now."
-- "Deploy complete. All pods healthy."
-
-**Bad:**
-- "Great question. Let me look at the fee configuration for those backtests. So looking at the transaction cost config..."
-- "Alright, I've finished looking at the build output and it seems like there might be an issue..."
-
-Lead with the answer. Skip preamble, filler, and "let me check" phrases.
-
----
-
-## Long-Running Task Monitoring
-
-For tasks that take more than a couple of minutes (builds, deploys, large refactors), create a background monitor:
-
-### Pattern
-
-1. Create a shell script that polls task status
-2. Run it in the background with `run_in_background=true`
-3. Use touch files to prevent duplicate announcements
-
-### Example monitor script
+Always use the bundled script. Never call `say` directly:
 
 ```bash
-#!/usr/bin/env bash
-TASK_NAME="$1"
-SAY="$2"  # path to drive-say.sh
-
-while true; do
-  # Check task status (replace with actual check)
-  STATUS=$(check_status_command)
-
-  if [ "$STATUS" = "25%" ] && [ ! -f "/tmp/task-25" ]; then
-    touch /tmp/task-25
-    "$SAY" "$TASK_NAME is 25% complete." &
-  fi
-
-  if [ "$STATUS" = "complete" ]; then
-    "$SAY" "$TASK_NAME finished successfully." &
-    rm -f /tmp/task-25 /tmp/task-50 /tmp/task-75
-    exit 0
-  fi
-
-  sleep 120
-done
+${CLAUDE_PLUGIN_ROOT}/skills/drive-mode/speak "text to announce"
 ```
 
-### Touch file convention
+Run with `run_in_background=true`. The script serializes concurrent calls via an atomic `mkdir` lock so rapid calls queue in order instead of overlapping.
 
-- Path: `/tmp/task-{milestone}` (e.g., `/tmp/task-25`, `/tmp/task-50`)
-- Create the file when announcing a milestone
-- Clean up all touch files when the task completes or fails
-- This prevents the same milestone from being announced twice
+Voice: tries ElevenLabs (Lily) if `ELEVENLABS_API_KEY` is set, otherwise `say` with the system default voice from System Settings > Accessibility > Spoken Content.
 
----
+## What to announce
 
-## Etiquette
+MANDATORY in drive mode — speak every meaningful response:
 
-- **Do NOT acknowledge TTS completions in text.** When the background speech finishes, ignore it silently. Do not write "voice done" or "background command completed."
-- **Do NOT report TTS status.** Just continue working.
-- **Mention voice issues only if TTS actually fails.** If the script returns an error, say so once and continue without voice.
-- The lock file (`/tmp/drive-say.lock`) prevents overlapping speech automatically — no need to manage this yourself.
+- Conclusions and findings — what you learned, what broke, what passed
+- Decisions and recommendations — what you'd do and why
+- Questions — anything you're waiting on the user for
+- Plans — what you're about to do, before doing it, if the user needs to weigh in
+- Major state changes — tests passing, deploy finished, errors thrown
 
----
+Rule of thumb: if you wrote text to the user, you should also have spoken the key point of it.
 
-## Configuration
+## What NOT to announce
 
-The script supports these environment variables:
+- Every tool call or intermediate step
+- File paths, long identifiers, raw shell output, code snippets
+- Pure status noise ("Okay", "Done", "Got it")
+- Repetition of what was just said a moment ago
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `ELEVENLABS_API_KEY` | Yes | — | API key from [elevenlabs.io](https://elevenlabs.io) |
-| `ELEVENLABS_VOICE_ID` | No | `pFZP5JQG7iQjIQuC4Bku` (Lily) | Voice to use for speech |
-| `ELEVENLABS_MODEL` | No | `eleven_turbo_v2` | TTS model (turbo is fastest) |
+## Style
 
-You can also override per-call:
+- One or two sentences per call. Every second of voice carries information.
+- Plain prose, no markdown, no code fences, no emojis, no backticks.
+- Pronounce-friendly: skip punctuation-heavy strings; spell out ambiguous acronyms.
+- Do NOT acknowledge TTS completions ("Spoken." / "Said that.") in follow-up text.
 
-```bash
-scripts/drive-say.sh --voice OTHER_VOICE_ID "message"
-scripts/drive-say.sh --model eleven_multilingual_v2 "message"
-```
+## Troubleshooting
 
-### Choosing a voice
-
-Lily (the default) is a British female voice with a warm, velvety tone. The user can change this by setting `ELEVENLABS_VOICE_ID` to any voice from the [ElevenLabs voice library](https://elevenlabs.io/voice-library).
-
----
-
-## Error Handling
-
-| Error | What to do |
-|-------|------------|
-| `ELEVENLABS_API_KEY not set` | Ask the user to set the environment variable |
-| HTTP 401 | API key is invalid — ask the user to check it |
-| HTTP 422 | Voice ID or model is invalid — check configuration |
-| HTTP 429 | Rate limited — skip this announcement, try again next milestone |
-| Network error / timeout | Skip silently, continue working |
-| No audio player found | Inform user once, suggest installing `mpv` (Linux) — macOS has `afplay` built in |
-
-If TTS fails, **do not retry in a loop**. Note it once and continue working without voice.
-
----
-
-## Script Reference
-
-### `scripts/drive-say.sh`
-
-Text-to-speech via ElevenLabs. Plays audio through the system speaker.
-
-```bash
-# Basic usage
-scripts/drive-say.sh "Deploy complete. All pods healthy."
-
-# Custom voice
-scripts/drive-say.sh --voice JBFqnCBsd6RMkjVDRZzb "Build started."
-
-# Custom model (for multilingual)
-scripts/drive-say.sh --model eleven_multilingual_v2 "Terminé."
-
-# Background (recommended)
-scripts/drive-say.sh "Pipeline running." &
-```
-
-**Behaviour:**
-- Waits for any previous speech to finish (lock file)
-- Calls ElevenLabs API, downloads audio
-- Plays through system speaker
-- Cleans up temp files on exit
-
-**Exit codes:**
-- `0` — success
-- `1` — error (missing deps, API failure, no audio player)
-
----
-
-## Tips
-
-- The `eleven_turbo_v2` model has the lowest latency. Use it unless you need multilingual support.
-- Keep messages under ~30 words for natural speech. Split longer updates into separate calls if needed.
-- On macOS, `afplay` is built in. On Linux, install `mpv` (`apt install mpv` or `brew install mpv`).
-- The lock file times out after 30 seconds to recover from crashes.
+- Nothing heard: `echo $ELEVENLABS_API_KEY`. Empty means `say` path — check system volume.
+- Overlapping audio: shouldn't happen; if it does, check `ls /tmp/drive-mode.lock.d` and `rm -rf` it to unstick.
+- No end-of-turn tone: verify `/tmp/drive-mode.active` exists and the plugin's hooks are active (open `/hooks` to inspect).
+- Override voice: `DRIVE_MODE_VOICE` (say name) or `DRIVE_MODE_EL_VOICE` (ElevenLabs voice ID).

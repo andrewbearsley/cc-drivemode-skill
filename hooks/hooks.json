@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rm -f /tmp/drive-mode.active"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f /tmp/drive-mode.active ] && afplay /System/Library/Sounds/Morse.aiff || true"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f /tmp/drive-mode.active ] && afplay /System/Library/Sounds/Glass.aiff || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f /tmp/drive-mode.active ] && { pkill -x say 2>/dev/null; pkill -x afplay 2>/dev/null; rm -rf /tmp/drive-mode.lock.d; } ; true"
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/task-complete.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
